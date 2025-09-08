@@ -1,0 +1,26 @@
+bind name = "Vivaan"
+bind age = 17
+
+emit name
+emit age
+
+repeat 3:
+    emit "Looping!"
+
+repeat x in 3:
+    if x == 1:
+        emit "special case"
+    emit x
+
+bind age = 17
+
+if age > 20:
+    emit "old"
+orif age > 10:
+    emit "teen"
+else:
+    emit "young"
+
+bind text = 4 % 2
+
+emit text

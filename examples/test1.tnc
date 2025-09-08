@@ -1,0 +1,12 @@
+bind number = 5
+bind name = "Vivaan"
+
+repeat 5:
+    emit "Hello!"
+    emit name
+
+emit "Done!"
+
+emit number
+emit name
+emit "Hello world"

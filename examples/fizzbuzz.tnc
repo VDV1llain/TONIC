@@ -1,0 +1,10 @@
+bind number = 15
+repeat x in number:
+    if x % 5 == 0 and x % 3 == 0:
+        emit "FIZZBUZZ"
+    orif x % 5 == 0:
+        emit "BUZZ"
+    orif x % 3 == 0:
+        emit "FIZZ"
+    else:
+        emit x

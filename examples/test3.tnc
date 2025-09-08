@@ -1,0 +1,8 @@
+bind a = 5
+bind b = 10
+
+emit a + b
+emit a * 3
+
+repeat 2:
+    emit b - a
