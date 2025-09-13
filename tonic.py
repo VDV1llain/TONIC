@@ -51,53 +51,46 @@ def execute_lines(lines):
             i += 1
             continue
 
-
-        # Unified if/orif/else chain handling
+        # if condition:
         if stripped.startswith("if ") and stripped.endswith(":"):
-            branches = []
-            # Collect the initial if branch
             cond = stripped[3:-1].strip()
             block = []
             i += 1
             while i < len(lines) and lines[i].startswith("    "):
                 block.append(lines[i][4:])
                 i += 1
-            branches.append((cond, block))
 
-            # Collect subsequent orif/else branches at the same indentation level
-            while i < len(lines):
-                next_line = lines[i].rstrip()
-                next_stripped = next_line.strip()
-                # Check if line starts with orif or else: without indentation
-                if next_stripped.startswith("orif ") and next_stripped.endswith(":") and not next_line.startswith("    "):
-                    cond = next_stripped[5:-1].strip()
-                    block = []
+            if eval_expr(cond):
+                execute_lines(block)
+                # skip following orif/else
+                while i < len(lines) and (lines[i].lstrip().startswith("orif ") or lines[i].lstrip().startswith("else:")):
                     i += 1
-                    while i < len(lines) and lines[i].startswith("    "):
-                        block.append(lines[i][4:])
-                        i += 1
-                    branches.append((cond, block))
-                elif next_stripped == "else:" and not next_line.startswith("    "):
-                    block = []
-                    i += 1
-                    while i < len(lines) and lines[i].startswith("    "):
-                        block.append(lines[i][4:])
-                        i += 1
-                    branches.append((None, block))
-                    break
-                else:
-                    break
+            continue
 
-            branch_executed = False
-            for cond, block in branches:
-                if cond is None:
-                    if not branch_executed:
-                        execute_lines(block)
-                        branch_executed = True
-                else:
-                    if not branch_executed and eval_expr(cond):
-                        execute_lines(block)
-                        branch_executed = True
+        # orif condition:
+        if stripped.startswith("orif ") and stripped.endswith(":"):
+            cond = stripped[5:-1].strip()
+            block = []
+            i += 1
+            while i < len(lines) and lines[i].startswith("    "):
+                block.append(lines[i][4:])
+                i += 1
+
+            if eval_expr(cond):
+                execute_lines(block)
+                # skip following orif/else
+                while i < len(lines) and (lines[i].lstrip().startswith("orif ") or lines[i].lstrip().startswith("else:")):
+                    i += 1
+            continue
+
+        # else:
+        if stripped == "else:":
+            block = []
+            i += 1
+            while i < len(lines) and lines[i].startswith("    "):
+                block.append(lines[i][4:])
+                i += 1
+            execute_lines(block)
             continue
 
         # repeat x in N:
@@ -142,4 +135,4 @@ def run_file(filename):
     execute_lines(lines)
 
 if __name__ == "__main__":
-    run_file("examples/test5.tnc")
+    run_file("examples/fizzbuzz.tnc")
