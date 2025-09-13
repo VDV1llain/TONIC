@@ -24,11 +24,10 @@ repeat x in number:
 // ===========================
 // NESTED LOOPS
 // ===========================
-repeat 2:
-    emit "Outer loop"
+repeat x in 2:
+    emit "Outer loop: " + x
     repeat y in 3:
-        emit "  Inner loop value:"
-        emit y
+        emit "  Inner loop value: " + y
 
 // ===========================
 // IF / ORIF / ELSE
