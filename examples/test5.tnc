@@ -48,3 +48,11 @@ orif test_value == 10:
     emit "exact match"
 else:
     emit "other"
+
+// ===========================
+// CONCATENATION
+// ===========================
+
+bind name = "Vivaan"
+bind age = 21
+emit "Hello, " + name + "! You are " + age
