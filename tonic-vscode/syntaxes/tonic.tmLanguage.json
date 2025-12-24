@@ -1,0 +1,29 @@
+{
+      "scopeName": "source.tonic",
+      "patterns": [
+            {
+                  "match": "\\b(bind|emit|repeat|if|orif|else)\\b",
+                  "name": "keyword.control.tonic"
+            },
+            {
+                  "match": "\".*?\"",
+                  "name": "string.quoted.double.tonic"
+            },
+            {
+                  "match": "\\b[0-9]+\\b",
+                  "name": "constant.numeric.tonic"
+            },
+            {
+                  "match": "//.*$",
+                  "name": "comment.line.double-slash.tonic"
+            },
+            {
+                  "match": "(==|!=|>=|<=|=|>|<|\\+|%|\\-|\\*|\\/)",
+                  "name": "keyword.operator.tonic"
+            },
+            {
+                  "match": "\\b(true|false|null|none)\\b",
+                  "name": "variable.language.tonic"
+            }
+      ]
+}

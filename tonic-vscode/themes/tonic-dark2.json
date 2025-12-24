@@ -1,0 +1,48 @@
+{
+      "name": "Tonic Dark 2",
+      "type": "dark",
+      "colors": {
+
+            "editor.foreground": "#f8f8f2"
+      },
+      "tokenColors": [
+            {
+                  "scope": "keyword.control.tonic",
+                  "settings": {
+                        "foreground": "#FD5200",
+                        "fontStyle": "bold"
+                  }
+            },
+            {
+                  "scope": "string.quoted.double.tonic",
+                  "settings": {
+                        "foreground": "#00CFC1"
+                  }
+            },
+            {
+                  "scope": "constant.numeric.tonic",
+                  "settings": {
+                        "foreground": "#76F7BF"
+                  }
+            },
+            {
+                  "scope": "comment.line.double-slash.tonic",
+                  "settings": {
+                        "foreground": "#5E6472",
+                        "fontStyle": "italic"
+                  }
+            },
+            {
+                  "scope": "variable.language.tonic",
+                  "settings": {
+                        "foreground": "#8be9fd"
+                  }
+            },
+            {
+                  "scope": "keyword.operator.tonic",
+                  "settings": {
+                        "foreground": "#FF79C6"
+                  }
+            }
+      ]
+}

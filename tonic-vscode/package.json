@@ -1,0 +1,50 @@
+{
+      "name": "tonic-language",
+      "displayName": "TONIC",
+      "description": "Syntax highlighting for the TONIC programming language",
+      "version": "0.0.1",
+      "publisher": "vivaan",
+      "engines": {
+            "vscode": "^1.80.0"
+      },
+      "contributes": {
+            "languages": [
+                  {
+                        "id": "tonic",
+                        "aliases": [
+                              "TONIC",
+                              "tonic"
+                        ],
+                        "extensions": [
+                              ".tnc"
+                        ],
+                        "configuration": "./language-configuration.json"
+                  }
+            ],
+            "grammars": [
+                  {
+                        "language": "tonic",
+                        "scopeName": "source.tonic",
+                        "path": "./syntaxes/tonic.tmLanguage.json"
+                  }
+            ],
+            "snippets": [
+                  {
+                        "language": "tonic",
+                        "path": "./snippets/tonic.code-snippets"
+                  }
+            ],
+            "themes": [
+                  {
+                        "label": "Tonic Dark",
+                        "uiTheme": "vs-dark",
+                        "path": "./themes/tonic-dark.json"
+                  },
+                  {
+                        "label": "Tonic Dark 2",
+                        "uiTheme": "vs-dark",
+                        "path": "./themes/tonic-dark2.json"
+                  }
+            ]
+      }
+}
