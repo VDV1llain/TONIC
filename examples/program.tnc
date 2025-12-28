@@ -1,27 +1,17 @@
-// Test program for basic lists, functions, loops, and emit
+bind grades = [3.5, 4.0, 3.8]
 
-emit "Welcome to the List Test!"
+repeat g in grades:
+    emit "Grade: " + g
 
-// --- List binding ---
-bind fruits = ["apple", "banana", "cherry"]
+bind nums = []
 
-// --- Function to print a specific element ---
-make print_item(lst, idx):
-    bind text = "Item " + str(idx) + ": "
-    bind value = lst[idx]
-    emit text + value
+append(nums, 10)
+append(nums, 20)
 
-bind fruits = ["apple", "banana", "cherry"]
+append(nums, 4.0)
+emit len(nums)
+emit nums
 
-repeat i in 3:
-    print_item(fruits, i)
+append(grades, nums)
 
-fruits[1] = "blueberry"
-
-repeat i in 3:
-    print_item(fruits, i)
-// --- Simple input test ---
-bind choice = get("Pick a number 0-" + (3 - 1) + ": ")
-bind picked = fruits[int(choice)]
-emit "You picked: "
-emit picked
+emit DEBUGGER

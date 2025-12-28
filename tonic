@@ -124,6 +124,14 @@ def print_scope():
         else:
             print("  (empty)\n")
 
+# List utility built-ins
+def list_len(val):
+    return len(val)
+
+def list_append(lst, value):
+    lst.append(value)
+    return None
+
 # ==========================
 # Utilities
 # ==========================
@@ -290,6 +298,14 @@ def eval_expr(expr, line_num=None):
                     elif name == "print_scope":
                         print_scope()
                         val = None
+                    elif name == "len":
+                        if len(evaled_args) != 1:
+                            raise ValueError("len() takes exactly one argument")
+                        val = list_len(evaled_args[0])
+                    elif name == "append":
+                        if len(evaled_args) != 2:
+                            raise ValueError("append() takes exactly two arguments")
+                        val = list_append(evaled_args[0], evaled_args[1])
                     elif name in functions:
                         fn = functions[name]
                         push_scope()
@@ -365,6 +381,14 @@ def eval_expr(expr, line_num=None):
         if name == "print_scope":
             print_scope()
             return None
+        if name == "len":
+            if len(evaled_args) != 1:
+                raise ValueError("len() takes exactly one argument")
+            return list_len(evaled_args[0])
+        if name == "append":
+            if len(evaled_args) != 2:
+                raise ValueError("append() takes exactly two arguments")
+            return list_append(evaled_args[0], evaled_args[1])
         if name in functions:
             fn = functions[name]
             push_scope()
@@ -520,6 +544,29 @@ def execute_lines(lines):
                     push_scope()
                     execute_lines(blk)
                     pop_scope()
+                    break
+            continue
+
+        # repeat item in list
+        if stripped.startswith("repeat ") and " in " in stripped and stripped.endswith(":"):
+            var, iterable = stripped[7:-1].split(" in ", 1)
+            iterable_val = eval_expr(iterable.strip(), current_line_number)
+            if not isinstance(iterable_val, list):
+                raise ValueError(f"Cannot iterate over non-list (line {current_line_number})")
+
+            block = []
+            i += 1
+            while i < len(lines) and lines[i].startswith("    "):
+                block.append(lines[i][4:])
+                i += 1
+
+            for item in iterable_val:
+                set_var(var.strip(), item, current_line_number)
+                try:
+                    execute_lines(block)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
                     break
             continue
 
