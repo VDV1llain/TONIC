@@ -1,0 +1,27 @@
+// Test program for basic lists, functions, loops, and emit
+
+emit "Welcome to the List Test!"
+
+// --- List binding ---
+bind fruits = ["apple", "banana", "cherry"]
+
+// --- Function to print a specific element ---
+make print_item(lst, idx):
+    bind text = "Item " + str(idx) + ": "
+    bind value = lst[idx]
+    emit text + value
+
+bind fruits = ["apple", "banana", "cherry"]
+
+repeat i in 3:
+    print_item(fruits, i)
+
+fruits[1] = "blueberry"
+
+repeat i in 3:
+    print_item(fruits, i)
+// --- Simple input test ---
+bind choice = get("Pick a number 0-" + (3 - 1) + ": ")
+bind picked = fruits[int(choice)]
+emit "You picked: "
+emit picked

@@ -1,4 +1,0 @@
-if age > 10:
-    emit "You’re older than 10"
-else:
-    emit "You’re 10 or younger"

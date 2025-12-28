@@ -1,0 +1,550 @@
+#!/usr/bin/env python3
+import sys
+import time
+
+# ==========================
+# Runtime state
+# ==========================
+scopes = [{}]
+functions = {}
+
+current_line_number = None  # Global variable to track current line number
+
+# ==========================
+# Control flow signals
+# ==========================
+class BreakSignal(Exception): pass
+class ContinueSignal(Exception): pass
+
+class ReturnSignal(Exception):
+    def __init__(self, value):
+        self.value = value
+
+# ==========================
+# Scope helpers
+# ==========================
+def get_var(name, line_num=None):
+    for scope in reversed(scopes):
+        if name in scope:
+            return scope[name]
+    if line_num is not None:
+        raise NameError(f"Undefined variable: {name} (line {line_num})")
+    else:
+        raise NameError(f"Undefined variable: {name}")
+
+def set_var(name, value, line_num=None):
+    scopes[-1][name] = value
+
+def assign_var(name, value, line_num=None):
+    # Support arr[index] = value (single-level only)
+    if "[" in name and name.endswith("]"):
+        arr_name = name[:name.index("[")].strip()
+        idx_expr = name[name.index("[")+1:-1].strip()
+        arr = None
+        for scope in reversed(scopes):
+            if arr_name in scope:
+                arr = scope[arr_name]
+                break
+        if arr is None:
+            if line_num is not None:
+                raise ValueError(f"Variable '{arr_name}' not defined (line {line_num})")
+            else:
+                raise ValueError(f"Variable '{arr_name}' not defined")
+        idx = eval_expr(idx_expr, line_num)
+        try:
+            arr[idx] = value
+        except Exception as e:
+            raise ValueError(f"Failed to assign to {name}: {e}")
+        return
+    # Normal assignment
+    for scope in reversed(scopes):
+        if name in scope:
+            scope[name] = value
+            return
+    if line_num is not None:
+        raise ValueError(f"Variable '{name}' not defined (line {line_num})")
+    else:
+        raise ValueError(f"Variable '{name}' not defined")
+# ==========================
+# List helpers
+# ==========================
+def split_list_items(s):
+    # Split by commas at top level (not in quotes or parens)
+    items = []
+    cur = ''
+    in_quotes = False
+    paren_depth = 0
+    for c in s:
+        if c == '"':
+            in_quotes = not in_quotes
+            cur += c
+        elif c == '(' and not in_quotes:
+            paren_depth += 1
+            cur += c
+        elif c == ')' and not in_quotes:
+            paren_depth -= 1
+            cur += c
+        elif c == ',' and not in_quotes and paren_depth == 0:
+            items.append(cur.strip())
+            cur = ''
+        else:
+            cur += c
+    if cur.strip():
+        items.append(cur.strip())
+    return items
+
+def push_scope():
+    scopes.append({})
+
+def pop_scope():
+    scopes.pop()
+
+# ==========================
+# Built-ins
+# ==========================
+def emit(val):
+    # Special handling for DEBUGGER
+    if val == "__DEBUGGER__":
+        print_scope()
+        return
+    print(val)
+
+def input_func(prompt=""):
+    return input(str(prompt))
+
+def print_scope():
+    # Print variables from outermost to innermost scope
+    print("Current scopes:\n")
+    for i, scope in enumerate(scopes):
+        print(f"    Scope level {i}:")
+        if scope:
+            for k, v in scope.items():
+                print(f"      {k} = {v}")
+            print(" ")
+        else:
+            print("  (empty)\n")
+
+# ==========================
+# Utilities
+# ==========================
+def split_args(s):
+    args, cur, depth = [], "", 0
+    for c in s:
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "," and depth == 0:
+            args.append(cur.strip())
+            cur = ""
+            continue
+        cur += c
+    if cur.strip():
+        args.append(cur.strip())
+    return args
+
+def split_plus(expr):
+    parts = []
+    current = ""
+    in_quotes = False
+    paren_depth = 0
+    for c in expr:
+        if c == '"':
+            in_quotes = not in_quotes
+        elif c == '(' and not in_quotes:
+            paren_depth += 1
+        elif c == ')' and not in_quotes:
+            paren_depth -= 1
+        elif c == '+' and not in_quotes and paren_depth == 0:
+            parts.append(current.strip())
+            current = ""
+            continue
+        current += c
+    if current.strip():
+        parts.append(current.strip())
+    return parts
+
+# ==========================
+# Expression evaluation
+# ==========================
+def eval_expr(expr, line_num=None):
+    expr = expr.strip()
+    expr = expr.replace("true", "True").replace("false", "False")
+
+    # Special handling for DEBUGGER
+    if expr == "DEBUGGER":
+        return "__DEBUGGER__"
+
+    # List literal support: [item1, item2, ...] (single-line, no nesting)
+    if expr.startswith("[") and expr.endswith("]"):
+        inner = expr[1:-1].strip()
+        if not inner:
+            return []
+        items = split_list_items(inner)
+        return [eval_expr(item, line_num) for item in items]
+
+    # List indexing support: arr[index]
+    if "[" in expr and expr.endswith("]"):
+        arr_name = expr[:expr.index("[")].strip()
+        idx_expr = expr[expr.index("[")+1:-1].strip()
+        arr = get_var(arr_name, line_num)
+        idx = eval_expr(idx_expr, line_num)
+        try:
+            return arr[idx]
+        except Exception as e:
+            raise ValueError(f"Failed to index {expr}: {e}")
+
+    # Check for invalid operators outside quotes
+    outside = ""
+    in_quotes = False
+    i = 0
+    while i < len(expr):
+        c = expr[i]
+        if c == '"':
+            in_quotes = not in_quotes
+            outside += c
+            i += 1
+            continue
+        if not in_quotes:
+            outside += c
+        i += 1
+    if "&" in outside or "|" in outside:
+        if line_num is not None:
+            raise SyntaxError(f"Use 'and' / 'or' (expression: '{expr}', line {line_num})")
+        else:
+            raise SyntaxError("Use 'and' / 'or'")
+    if "!" in outside and "!=" not in outside:
+        if line_num is not None:
+            raise SyntaxError(f"Use 'not' (expression: '{expr}', line {line_num})")
+        else:
+            raise SyntaxError("Use 'not'")
+
+    # Handle + operator for string concatenation and addition iteratively
+    if "+" in outside:
+        parts = split_plus(expr)
+        values = []
+        for part in parts:
+            part = part.strip()
+            # Evaluate each part without recursion on '+'
+            # Handle literals
+            if part.startswith('"') and part.endswith('"') and len(part) >= 2:
+                val = part[1:-1]
+            elif part.isdigit() or (part.startswith("-") and part[1:].isdigit()):
+                val = int(part)
+            elif part.startswith("[") and part.endswith("]"):
+                inner = part[1:-1].strip()
+                if not inner:
+                    val = []
+                else:
+                    items = split_list_items(inner)
+                    val = [eval_expr(item, line_num) for item in items]
+            elif "[" in part and part.endswith("]"):
+                arr_name = part[:part.index("[")].strip()
+                idx_expr = part[part.index("[")+1:-1].strip()
+                arr = get_var(arr_name, line_num)
+                idx = eval_expr(idx_expr, line_num)
+                try:
+                    val = arr[idx]
+                except Exception as e:
+                    raise ValueError(f"Failed to index {part}: {e}")
+            else:
+                # Function call check
+                def is_function_call(s):
+                    s = s.strip()
+                    if '(' in s and s.endswith(')'):
+                        name_part = s[:s.index('(')].strip()
+                        if name_part and (name_part[0].isalpha() or name_part[0] == '_'):
+                            return True
+                    return False
+                if is_function_call(part):
+                    name = part[:part.index("(")].strip()
+                    arg_str = part[part.index("(")+1:-1]
+                    args = []
+                    if arg_str.strip():
+                        args = split_args(arg_str)
+                    evaled_args = [eval_expr(a, line_num) for a in args]
+
+                    if name == "get":
+                        val = input_func(evaled_args[0] if evaled_args else "")
+                        val = int(val) if val.strip().isdigit() else val
+                    elif name == "int":
+                        if evaled_args:
+                            val = int(evaled_args[0])
+                        else:
+                            val = 0
+                    elif name == "wait":
+                        time.sleep(float(evaled_args[0]))
+                        val = None
+                    elif name == "str":
+                        if evaled_args:
+                            val = str(evaled_args[0])
+                        else:
+                            val = ""
+                    elif name == "print_scope":
+                        print_scope()
+                        val = None
+                    elif name in functions:
+                        fn = functions[name]
+                        push_scope()
+                        for p, a in zip(fn["params"], evaled_args):
+                            set_var(p, a)
+                        try:
+                            execute_lines(fn["body"])
+                        except ReturnSignal as r:
+                            pop_scope()
+                            val = r.value
+                        else:
+                            pop_scope()
+                            val = None
+                    else:
+                        if line_num is not None:
+                            raise ValueError(f"Unknown function: {name} (expression: '{part}', line {line_num})")
+                        else:
+                            raise ValueError(f"Unknown function: {name}")
+                else:
+                    # variable or fallback
+                    try:
+                        val = get_var(part, line_num)
+                    except Exception:
+                        # fallback to python eval with safe globals and locals
+                        try:
+                            val = eval(part, {}, {k: v for s in scopes for k, v in s.items()})
+                        except:
+                            if line_num is not None:
+                                raise ValueError(f"Invalid expression: {part} (line {line_num})")
+                            else:
+                                raise ValueError(f"Invalid expression: {part}")
+            values.append(val)
+        if any(isinstance(x, str) for x in values):
+            return "".join(str(x) for x in values)
+        total = values[0]
+        for v in values[1:]:
+            total += v
+        return total
+
+    # Function call check
+    def is_function_call(s):
+        s = s.strip()
+        if '(' in s and s.endswith(')'):
+            name_part = s[:s.index('(')].strip()
+            if name_part and (name_part[0].isalpha() or name_part[0] == '_'):
+                return True
+        return False
+
+    if is_function_call(expr):
+        name = expr[:expr.index("(")].strip()
+        arg_str = expr[expr.index("(")+1:-1]
+        args = []
+        if arg_str.strip():
+            args = split_args(arg_str)
+        evaled_args = [eval_expr(a, line_num) for a in args]
+
+        if name == "get":
+            val = input_func(evaled_args[0] if evaled_args else "")
+            return int(val) if val.strip().isdigit() else val
+        if name == "int":
+            if evaled_args:
+                return int(evaled_args[0])
+            else:
+                return 0
+        if name == "wait":
+            time.sleep(float(evaled_args[0]))
+            return None
+        if name == "str":
+            if evaled_args:
+                return str(evaled_args[0])
+            else:
+                return ""
+        if name == "print_scope":
+            print_scope()
+            return None
+        if name in functions:
+            fn = functions[name]
+            push_scope()
+            for p, a in zip(fn["params"], evaled_args):
+                set_var(p, a)
+            try:
+                execute_lines(fn["body"])
+            except ReturnSignal as r:
+                pop_scope()
+                return r.value
+            pop_scope()
+            return None
+        if line_num is not None:
+            raise ValueError(f"Unknown function: {name} (expression: '{expr}', line {line_num})")
+        else:
+            raise ValueError(f"Unknown function: {name}")
+
+    # variable
+    try:
+        return get_var(expr, line_num)
+    except Exception:
+        pass
+
+    # literals
+    if expr.startswith('"') and expr.endswith('"') and len(expr) >= 2:
+        return expr[1:-1]
+    if expr.isdigit() or (expr.startswith("-") and expr[1:].isdigit()):
+        return int(expr)
+    if expr == "True":
+        return True
+    if expr == "False":
+        return False
+
+    # fallback to python eval with safe globals and locals
+    try:
+        return eval(expr, {}, {k: v for s in scopes for k, v in s.items()})
+    except:
+        if line_num is not None:
+            raise ValueError(f"Invalid expression: {expr} (line {line_num})")
+        else:
+            raise ValueError(f"Invalid expression: {expr}")
+
+# ==========================
+# Execution engine
+# ==========================
+def execute_lines(lines):
+    i = 0
+    while i < len(lines):
+        raw = lines[i].rstrip()
+        stripped = raw.strip()
+        global current_line_number
+        current_line_number = i + 1
+
+        if not stripped or stripped.startswith("//"):
+            i += 1
+            continue
+
+        if stripped == "break":
+            raise BreakSignal()
+        if stripped == "continue":
+            raise ContinueSignal()
+
+        if stripped.startswith("return"):
+            val = eval_expr(stripped[6:].strip(), current_line_number) if len(stripped) > 6 else None
+            raise ReturnSignal(val)
+
+        # func
+        if stripped.startswith("make ") and stripped.endswith(":"):
+            head = stripped[5:-1]
+            name = head[:head.index("(")].strip()
+            params = split_args(head[head.index("(")+1:-1])
+            block = []
+            i += 1
+            while i < len(lines) and lines[i].startswith("    "):
+                block.append(lines[i][4:])
+                i += 1
+            functions[name] = {"params": params, "body": block}
+            continue
+
+        # bind
+        if stripped.startswith("bind "):
+            try:
+                n, v = stripped[5:].split("=", 1)
+            except Exception:
+                raise ValueError(f"Invalid bind syntax (line {current_line_number})")
+            set_var(n.strip(), eval_expr(v.strip(), current_line_number), current_line_number)
+            i += 1
+            continue
+
+        # reassignment
+        if "=" in stripped and not stripped.startswith(("if ", "orif ", "repeat ")):
+            n, v = stripped.split("=", 1)
+            assign_var(n.strip(), eval_expr(v.strip(), current_line_number), current_line_number)
+            i += 1
+            continue
+
+        # emit
+        if stripped.startswith("emit "):
+            emit(eval_expr(stripped[5:], current_line_number))
+            i += 1
+            continue
+
+        # wait(seconds)
+        if stripped.startswith("wait(") and stripped.endswith(")"):
+            eval_expr(stripped, current_line_number)
+            i += 1
+            continue
+
+        # if / orif / else
+        if stripped.startswith("if ") and stripped.endswith(":"):
+            branches = []
+
+            def grab():
+                nonlocal i
+                blk = []
+                i += 1
+                while i < len(lines) and lines[i].startswith("    "):
+                    blk.append(lines[i][4:])
+                    i += 1
+                return blk
+
+            branches.append((stripped[3:-1], grab()))
+            while i < len(lines):
+                s = lines[i].strip()
+                if s.startswith("orif ") and s.endswith(":"):
+                    branches.append((s[5:-1], grab()))
+                elif s == "else:":
+                    branches.append((None, grab()))
+                    break
+                else:
+                    break
+
+            for cond, blk in branches:
+                if cond is None or eval_expr(cond, current_line_number):
+                    push_scope()
+                    execute_lines(blk)
+                    pop_scope()
+                    break
+            continue
+
+        # repeat i in N
+        if stripped.startswith("repeat ") and " in " in stripped:
+            try:
+                var, cnt = stripped[7:-1].split(" in ")
+            except Exception:
+                raise ValueError(f"Invalid repeat syntax (line {current_line_number})")
+            cnt = eval_expr(cnt, current_line_number)
+            block = []
+            i += 1
+            while i < len(lines) and lines[i].startswith("    "):
+                block.append(lines[i][4:])
+                i += 1
+            for v in range(cnt):
+                set_var(var.strip(), v, current_line_number)
+                try:
+                    execute_lines(block)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
+            continue
+
+        # After all known commands, check if this is a top-level function call
+        def is_function_call_line(s):
+            s = s.strip()
+            if '(' in s and s.endswith(')'):
+                name_part = s[:s.index('(')].strip()
+                if name_part and (name_part[0].isalpha() or name_part[0] == '_'):
+                    return True
+            return False
+
+        if is_function_call_line(stripped):
+            eval_expr(stripped, current_line_number)
+            i += 1
+            continue
+
+        raise ValueError(f"Unknown command: {stripped} (line {current_line_number})")
+
+# ==========================
+# Entry
+# ==========================
+def run_file(path):
+    with open(path) as f:
+        execute_lines(f.readlines())
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: tonic <file.tnc>")
+        sys.exit(1)
+    run_file(sys.argv[1])

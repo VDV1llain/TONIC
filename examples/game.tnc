@@ -1,0 +1,20 @@
+make ask(q):
+    return ask(q)
+
+emit "a small tonic game"
+
+bind score = 0
+bind password = 7
+bind rounds = 3
+
+repeat i in rounds:
+    emit "Round " + (i + 1)
+    bind guess = ask("guess " + (i + 1) + ": ")
+    wait(1)
+    if guess == password:
+        emit "✓"
+        score = score + 1
+    else:
+        emit "✗"
+
+emit "Game over! Your final score is: " + score + " out of " + rounds + "."
