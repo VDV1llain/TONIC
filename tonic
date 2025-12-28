@@ -171,6 +171,13 @@ def eval_expr(expr, line_num=None):
     expr = expr.strip()
     expr = expr.replace("true", "True").replace("false", "False")
 
+    # indexing (supports nesting)
+    if "[" in expr and expr.endswith("]"):
+        try:
+            return eval(expr, {}, {k: v for s in scopes for k, v in s.items()})
+        except Exception:
+            pass
+
     # Special handling for DEBUGGER
     if expr == "DEBUGGER":
         return "__DEBUGGER__"
@@ -437,13 +444,31 @@ def execute_lines(lines):
             functions[name] = {"params": params, "body": block}
             continue
 
-        # bind
+        # bind (supports multi-line nested lists)
         if stripped.startswith("bind "):
             try:
                 n, v = stripped[5:].split("=", 1)
             except Exception:
                 raise ValueError(f"Invalid bind syntax (line {current_line_number})")
-            set_var(n.strip(), eval_expr(v.strip(), current_line_number), current_line_number)
+
+            v = v.strip()
+
+            # multi-line list literal support with nesting
+            if v.startswith("["):
+                collected = v
+                depth = v.count("[") - v.count("]")
+                i += 1
+
+                while depth > 0 and i < len(lines):
+                    line_part = lines[i].strip()
+                    collected += line_part
+                    depth += line_part.count("[") - line_part.count("]")
+                    i += 1
+
+                set_var(n.strip(), eval_expr(collected, current_line_number), current_line_number)
+                continue
+
+            set_var(n.strip(), eval_expr(v, current_line_number), current_line_number)
             i += 1
             continue
 
